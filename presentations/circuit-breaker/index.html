@@ -1,0 +1,171 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="dist/reset.css">
+		<link rel="stylesheet" href="dist/reveal.css">
+		<link rel="stylesheet" href="dist/theme/black.css" id="theme">
+
+		<!-- Theme used for syntax highlighted code -->
+		<link rel="stylesheet" href="plugin/highlight/monokai.css" id="highlight-theme">
+		<style>
+			.reveal h1, .reveal h2 {
+				text-transform: none;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section>
+					<h1>Circuit Breaker</h1>
+					<p>Adam Białas</p>
+				</section>
+				<section>
+					<h2>External dependency</h2>
+					<ul>
+						<li class="fragment">timeouts</li>
+						<li class="fragment">exceptions</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Circuit breaker</h2>
+					<ul>
+						<li class="fragment">between our and external service</li>
+						<li class="fragment">three state machine</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Closed state</h2>
+					<ul>
+						<li class="fragment">external dependency works fine</li>
+						<li class="fragment">no impact on request</li>
+						<li class="fragment">initial state</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Open state</h2>
+					<ul>
+						<li class="fragment">external dependency is down or very slow</li>
+						<li class="fragment">request does not reach external service</li>
+						<li class="fragment">fail fast</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Half-open state</h2>
+					<ul>
+						<li class="fragment">check if external service is fixed</li>
+						<li class="fragment">configured numbers of calls are allowed to reach external service</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Sliding window</h2>
+					<ul>
+						<li class="fragment">stores info about latest calls</li>
+						<li class="fragment">count-based</li>
+						<li class="fragment">time-based</li>
+					</ul>
+				</section>
+				<section>
+					<h2>From Closed to Open</h2>
+					<ul>
+						<li class="fragment">failure rate exceeds threshold</li>
+						<li class="fragment">slow calls exceeds threshold</li>
+					</ul>
+				</section>
+				<section>
+					<h2>From Open to Half-Open</h2>
+					<ul>
+						<li class="fragment">after configured duration</li>
+					</ul>
+				</section>
+				<section>
+					<h2>From Half-Open to Closed</h2>
+					<ul>
+						<li class="fragment">failure rate / slow call rate not reached</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Create Circuit Breaker</h2>
+					<pre><code class="hljs fragment" data-trim>
+						<dependency>
+							<groupId>org.springframework.cloud</groupId>
+							<artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
+						</dependency>
+					</code></pre>
+					<pre><code class="java fragment" data-trim>
+						@Component
+						class LoanApiClient {
+							private final ReactiveCircuitBreaker circuitBreaker;
+						
+							LoanApiClient(ReactiveCircuitBreakerFactory circuitBreakerFactory) {
+								this.circuitBreaker = circuitBreakerFactory.create("loanApiCircuitBreaker");
+							}
+							
+							...
+							
+						}
+					</code></pre>
+				</section>
+				<section>
+					<h2>Usage</h2>
+					<pre><code class="java" data-trim>
+						Flux&lt;BorrowerWithLoans&gt; findBorrowersWithLoans() {
+							return circuitBreaker.run(webClient
+									.get()
+									.uri("/borrowers")
+									.retrieve()
+									.bodyToFlux(BorrowerWithLoans.class)
+									.log(), exception -> Flux.empty());
+						}
+					</code></pre>
+				</section>
+				<section>
+					<h2>Configuration</h2>
+					<pre><code class="java" data-trim>
+@Bean
+Customizer&lt;ReactiveResilience4JCircuitBreakerFactory&gt; defaultCustomizer() {
+	return factory -> factory.configureDefault(id ->
+		new Resilience4JConfigBuilder(id)
+			.circuitBreakerConfig(CircuitBreakerConfig
+				.custom()
+				.minimumNumberOfCalls(10)
+				.slidingWindowSize(10)
+				.waitDurationInOpenState(Duration.ofSeconds(10))
+				.build())
+			.timeLimiterConfig(TimeLimiterConfig
+				.custom()
+				.timeoutDuration(Duration.ofSeconds(5)).build())
+			.build());
+}</code></pre>
+				</section>
+				<section>
+					<h2>Sources and Documentation</h2>
+					<p><a href="https://github.com/abialas/circuit-breaker-demo">https://github.com/abialas/circuit-breaker-demo</a></p>
+					<p><a href="https://docs.spring.io/spring-cloud-circuitbreaker/docs/current/reference/html">Spring Cloud Circuit Breaker</a></p>
+					<p><a href="https://resilience4j.readme.io/docs/circuitbreaker">Resilience4j CircuitBreaker</a></p>
+				</section>
+			</div>
+		</div>
+
+		<script src="dist/reveal.js"></script>
+		<script src="plugin/notes/notes.js"></script>
+		<script src="plugin/markdown/markdown.js"></script>
+		<script src="plugin/highlight/highlight.js"></script>
+		<script>
+			// More info about initialization & config:
+			// - https://revealjs.com/initialization/
+			// - https://revealjs.com/config/
+			Reveal.initialize({
+				hash: true,
+				width: 1400,
+				// Learn about plugins: https://revealjs.com/plugins/
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+			});
+		</script>
+	</body>
+</html>
