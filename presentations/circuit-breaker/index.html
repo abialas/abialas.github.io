@@ -3,8 +3,9 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-		<title>reveal.js</title>
+		
+		<title>Circuit Breaker</title>
+		<meta name="author" content="Adam Białas">
 
 		<link rel="stylesheet" href="dist/reset.css">
 		<link rel="stylesheet" href="dist/reveal.css">
@@ -22,7 +23,7 @@
 		<div class="reveal">
 			<div class="slides">
 				<section>
-					<h1>Circuit Breaker</h1>
+					<h1>Circuit Breaker<br/>(Resilience4J)</h1>
 					<p>Adam Białas</p>
 				</section>
 				<section>
@@ -33,7 +34,7 @@
 					</ul>
 				</section>
 				<section>
-					<h2>Circuit breaker</h2>
+					<h2>Circuit Breaker</h2>
 					<ul>
 						<li class="fragment">between our and external service</li>
 						<li class="fragment">three state machine</li>
@@ -48,7 +49,7 @@
 					</ul>
 				</section>
 				<section>
-					<h2>Open state</h2>
+					<h2>Open State</h2>
 					<ul>
 						<li class="fragment">external dependency is down or very slow</li>
 						<li class="fragment">request does not reach external service</li>
@@ -56,14 +57,14 @@
 					</ul>
 				</section>
 				<section>
-					<h2>Half-open state</h2>
+					<h2>Half Open State</h2>
 					<ul>
 						<li class="fragment">check if external service is fixed</li>
 						<li class="fragment">configured numbers of calls are allowed to reach external service</li>
 					</ul>
 				</section>
 				<section>
-					<h2>Sliding window</h2>
+					<h2>Sliding Window</h2>
 					<ul>
 						<li class="fragment">stores info about latest calls</li>
 						<li class="fragment">count-based</li>
@@ -78,13 +79,13 @@
 					</ul>
 				</section>
 				<section>
-					<h2>From Open to Half-Open</h2>
+					<h2>From Open to Half Open</h2>
 					<ul>
 						<li class="fragment">after configured duration</li>
 					</ul>
 				</section>
 				<section>
-					<h2>From Half-Open to Closed</h2>
+					<h2>From Half Open to Closed</h2>
 					<ul>
 						<li class="fragment">failure rate / slow call rate not reached</li>
 					</ul>
