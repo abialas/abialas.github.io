@@ -91,6 +91,17 @@
 					</ul>
 				</section>
 				<section>
+					<h2>State Machine</h2>
+					<img src="img/circuit_breaker_state_machine.jpg">
+				</section>
+				<section>
+					<h2>Spring Cloud Circuit Breaker</h2>
+					<ul>
+						<li class="fragment">abstraction for circuit breaker implementations</li>
+						<li class="fragment">Resilience4J, Spring Retry, Hystrix (maintenance), Sentinel</li>
+					</ul>
+				</section>
+				<section>
 					<h2>Create Circuit Breaker</h2>
 					<pre><code class="hljs fragment" data-trim>
 						<dependency>
@@ -104,7 +115,7 @@
 							private final ReactiveCircuitBreaker circuitBreaker;
 						
 							LoanApiClient(ReactiveCircuitBreakerFactory circuitBreakerFactory) {
-								this.circuitBreaker = circuitBreakerFactory.create("loanApiCircuitBreaker");
+								this.circuitBreaker = circuitBreakerFactory.create("loanApi");
 							}
 							
 							...
@@ -126,10 +137,10 @@
 					</code></pre>
 				</section>
 				<section>
-					<h2>Configuration</h2>
+					<h2>Configuration (default)</h2>
 					<pre><code class="java" data-trim>
 @Bean
-Customizer&lt;ReactiveResilience4JCircuitBreakerFactory&gt; defaultCustomizer() {
+Customizer&lt;ReactiveResilience4JCircuitBreakerFactory&gt; defaultCircuitBreakerCustomizer() {
 	return factory -> factory.configureDefault(id ->
 		new Resilience4JConfigBuilder(id)
 			.circuitBreakerConfig(CircuitBreakerConfig
@@ -142,6 +153,25 @@ Customizer&lt;ReactiveResilience4JCircuitBreakerFactory&gt; defaultCustomizer() 
 				.custom()
 				.timeoutDuration(Duration.ofSeconds(5)).build())
 			.build());
+}</code></pre>
+				</section>
+				<section>
+					<h2>Configuration (specific id)</h2>
+					<pre><code class="java" data-trim>
+@Bean
+public Customizer&lt;ReactiveResilience4JCircuitBreakerFactory&gt; loanApiCircuitBreakerCustomizer() {
+	return factory ->
+		factory.configure(builder -> builder
+			.circuitBreakerConfig(CircuitBreakerConfig
+				.custom()
+				.minimumNumberOfCalls(100)
+				.slidingWindowSize(100)
+				.waitDurationInOpenState(Duration.ofSeconds(5))
+				.build())
+			.timeLimiterConfig(TimeLimiterConfig
+				.custom()
+				.timeoutDuration(Duration.ofSeconds(3)).build())
+			.build(), "loanApi");
 }</code></pre>
 				</section>
 				<section>
