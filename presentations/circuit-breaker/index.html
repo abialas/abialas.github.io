@@ -175,6 +175,27 @@ public Customizer&lt;ReactiveResilience4JCircuitBreakerFactory&gt; loanApiCircui
 }</code></pre>
 				</section>
 				<section>
+					<h2>Metrics</h2>
+					<pre><code class="hljs fragment" data-trim>
+						<dependency>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-starter-actuator</artifactId>
+						</dependency>
+						<dependency>
+							<groupId>io.github.resilience4j</groupId>
+							<artifactId>resilience4j-micrometer</artifactId>
+						</dependency>
+						<dependency>
+							<groupId>io.micrometer</groupId>
+							<artifactId>micrometer-registry-prometheus</artifactId>
+						</dependency>
+					</code></pre>
+					<pre><code class="hljs fragment" data-trim>
+						//application.properties
+						management.endpoints.web.exposure.include=metrics,prometheus
+					</code></pre>
+				</section>
+				<section>
 					<h2>Sources and Documentation</h2>
 					<p><a href="https://github.com/abialas/circuit-breaker-demo">https://github.com/abialas/circuit-breaker-demo</a></p>
 					<p><a href="https://docs.spring.io/spring-cloud-circuitbreaker/docs/current/reference/html">Spring Cloud Circuit Breaker</a></p>
