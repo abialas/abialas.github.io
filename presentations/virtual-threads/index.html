@@ -1,0 +1,484 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		
+		<title>Virtual Threads</title>
+		<meta name="author" content="Adam Białas">
+
+		<link rel="stylesheet" href="dist/reset.css">
+		<link rel="stylesheet" href="dist/reveal.css">
+		<link rel="stylesheet" href="dist/theme/white.css" id="theme">
+
+		<!-- Theme used for syntax highlighted code -->
+		<link rel="stylesheet" href="plugin/highlight/monokai.css" id="highlight-theme">
+		<style>
+			.reveal h1, .reveal h2 {
+				text-transform: none;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section>
+					<h1>VIRTUAL THREADS vs REACTIVE</h1>
+					<p>Adam Białas</p>
+					<p>Java Developer</p>
+					<p>Rich Messaging (Conversation API / WhatsApp Messaging)</p>
+				</section>
+				<section>
+					<h2>Agenda</h2>
+					<ul>
+						<li>Quick Reminder (JVM Thread)</li>
+						<li>Reactive (Spring Webflux)</li>
+						<li>Virtual Thread</li>
+						<li>Virtual Thread vs Reactive</li>
+					</ul>
+				</section>
+				<section>
+					<h2>JVM Thread</h2>
+						<p>Create thread (basic approach)</p>
+						<pre><code data-trim class="java">
+Thread thread = new Thread(() -> {
+	System.out.println("Thread started");
+	try {
+		Thread.sleep(60000);
+	} catch (InterruptedException e) {
+		throw new RuntimeException(e);
+	}
+}, "Sinch Conference");
+thread.start();
+						</code></pre>
+				</section>
+				<section>
+					<h2>JVM Thread</h2>
+						<p>JVM (user) and kernel thread mapping</p>
+						<pre><code data-trim class="java" data-line-numbers="8">
+Thread thread = new Thread(() -> {
+	System.out.println("Thread started");
+	try {
+		Thread.sleep(60000);
+	} catch (InterruptedException e) {
+		throw new RuntimeException(e);
+	}
+}, "Sinch Conference");
+thread.start();
+						</code></pre>
+					<p>TOP command output</p>
+					<img src="img/one-to-one.png" title="Top -H command output" height="100px">
+				</section>
+				<section>
+					<h2>JVM Thread</h2>
+					<ul>
+						<li>one user thread starts one kernel thread (1:1 model)</li>
+						<li>one thread consumes 1MB of native memory (for thread stack)</li>
+						<li>JVM threads are managed by kernel</li>
+					</ul>
+					<br/><br/>
+					<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html#platform-threads">Java Docs (Platform Thread)</a><br/>
+					<a href="https://docs.oracle.com/javase/8/docs/technotes/tools/unix/java.html">-XX:ThreadStackSize or -Xss</a>
+				</section>
+				<section>
+					<h2>JVM Thread</h2>
+					<p>Spring MVC Servlet Container Tomcat, 200 concurrent requests</p>
+					<div class="r-stack">
+						<img class="fragment fade-in-then-out" src="img/visual-vm-threads-chart.png">
+						<img class="fragment fade-in-then-out" src="img/visual-vm-threads-details.png">
+						<div class="fragment fade-in-then-out">
+							<img src="img/native-memory-consumption.png">
+							<p>-XX:NativeMemoryTracking=summary, -XX:+UnlockDiagnosticVMOptions</p>
+						</div>
+					</div>
+				</section>
+				<section>
+					<h2>JVM Thread</h2>
+					<p>Problems:</p>
+					<ul>
+						<li>additional overhead for native memory (thread stack)</li>
+						<li>thread start by kernel is not for free (workaround: reusable thread pool)</li>
+						<li>overhead for kernel</li>
+						<li>not efficient resource utilization (blocking / waiting on IO)</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Reactive (Spring Webflux)</h2>
+					<ul>
+						<li>solves problems of JVM threads (thread sharing)</li>
+						<li>requires reactive drivers for database, queue etc.</li>
+						<li>blocking code must be call on separate thread (Schedulers.boundedElastic())</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Reactive (Spring Webflux)</h2>
+					<p>Problems:</p>
+					<ul>
+						<li>high entry point (complex API)</li>
+						<li>hard to debug</li>
+						<li>thread local missing (workarounds with context passing)</li>
+						<li>blocking call (e.g. Thread.sleep) might kill performance of the app</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Reactive (Spring Webflux)</h2>
+					<p>Spring Webflux Netty, 200 concurrent requests</p>
+					<div class="r-stack">
+						<img class="fragment fade-in-then-out" src="img/visual-vm-reactor-threads-chart.png">
+						<img class="fragment fade-in-then-out" src="img/visual-vm-reactor-threads-details.png">
+						<img class="fragment fade-in-then-out" src="img/native-memory-consumption-reactive.png">
+					</div>
+				</section>
+				<section>
+					<h2>Reactive</h2>
+					<p>Summary</p>
+					<ul>
+						<li>better resource usage (threads shared instead of just waiting on IO)</li>
+						<li>does not follow thread per request model (only few threads handle requests)</li>
+						<li>high entry point</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Virtual Threads</h2>
+					<ul>
+						<li>Project Loom (preview feature in Java 19, finalized in Java 21)</li>
+						<li>taxi metaphor</li>
+						<li>platform thread managed by kernel, virtual thread managed by JVM</li>
+						<li>all virtual threads run on few platform (carrier) threads</li>
+						<li>virtual thread is bounded to carrier thread only when it needs CPU</li>
+						<li>JVM internal scheduler is used to assign virtual thread to carrier thread</li>
+						<li>enables efficient thread-per-request style (simple, easy to debug)</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Virtual Threads</h2>
+					<p>Thread-per-request with Spring MVC and Tomcat</p>					
+						<pre><code data-trim class="java">
+@GetMapping("/{postId}")
+Post getPost(@PathVariable String postId) {
+	log.info("Getting post: {}", postId);
+	Post post = slowServiceClient.getPost(postId);
+	log.info("Got post {}: {}", postId, post);
+	return post;
+}
+						</code></pre>
+						<pre><code data-trim class="java">
+							#application.properties
+							spring.threads.virtual.enabled=true
+						</code></pre>
+				</section>
+				<section>
+					<h2>Virtual Threads</h2>
+						<p>Start new VirtualThread</p>
+						<pre><code data-trim class="java">
+Thread thread = Thread.ofVirtual()
+	.name("Sinch Conference Virtual")
+	.start(() -> {
+		log.info("Thread started");
+		try {
+			Thread.sleep(60000);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+	});
+						</code></pre>
+				</section>
+				<section>
+					<h2>Virtual Threads</h2>
+						<p>Start new VirtualThread with ExecutorService</p>
+						<pre><code data-trim class="java">
+try (var virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
+	virtualThreadExecutor.submit(() -> {
+		log.info("Thread started");
+		try {
+			Thread.sleep(60000);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+	});
+}
+						</code></pre>
+				</section>
+				<section>
+					<h2>Virtual Threads</h2>
+					<p>Execute tasks in parallel</p>
+						<pre><code data-trim class="java">
+try (var virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
+	Future&lt;String&gt; dataFromUrl = virtualThreadExecutor
+			.submit(() -> fetchDataFromUrl());
+	Future&lt;String&gt; dataFromDb = virtualThreadExecutor
+			.submit(() -> fetchDataFromDatabase());
+	log.info("Data from url: {}, data from db: {}", dataFromUrl.get(), dataFromDb.get());
+} catch (ExecutionException e) {
+	log.error("Error when fetching data", e);
+	throw new RuntimeException(e);
+}
+						</code></pre>
+				</section>
+				<section>
+					<h2>Virtual Threads (internals)</h2>
+					<p>Continuation object</p>
+					<ul>
+						<li>represents thread state (call stack, variables)</li>
+						<li>allows to stop and resume thread at given point</li>
+						<li>kept on heap</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Virtual Threads (internals)</h2>
+					<p>Continuation object</p>
+					<pre><code data-trim class="java">
+					var scope = new ContinuationScope("scope");
+					var continuation = new Continuation(scope, () -> {
+						List&lt;String&gt; values = new ArrayList&lt;&gt;();
+						log.info("Start thread (list values: {})", values);
+						values.add("foo");
+						Continuation.yield(scope);
+						log.info("Continue thread (list values: {})", values);
+						values.add("bar");
+						Continuation.yield(scope);
+						log.info("Continue thread (list values: {})", values);
+					});
+					while (!continuation.isDone()) {
+						continuation.run();
+					}
+					</code></pre>
+				</section>
+				<section>
+					<h2>Virtual Threads (internals)</h2>
+					<p>Continuation object</p>
+					<pre><code data-trim class="java" data-line-numbers="6,9,13">
+	var scope = new ContinuationScope("scope");
+	var continuation = new Continuation(scope, () -> {
+		List&lt;String&gt; values = new ArrayList&lt;&gt;();
+		log.info("Start thread (list values: {})", values);
+		values.add("foo");
+		Continuation.yield(scope);
+		log.info("Continue thread (list values: {})", values);
+		values.add("bar");
+		Continuation.yield(scope);
+		log.info("Continue thread (list values: {})", values);
+	});
+	while (!continuation.isDone()) {
+		continuation.run();
+	}
+					</code></pre>
+					<code><pre>
+Start thread (list values: [])
+Continue thread (list values: [foo])
+Continue thread (list values: [foo, bar])
+</code></pre>
+				</section>
+				<section>
+					<h2>Virtual Threads</h2>
+					<p>Problems:</p>
+					<ul>
+						<li>time sharing not implemented in JVM thread scheduler (preemption)</li>
+						<li>impact on GC</li>
+						<li>some operations (blocking in synchronized block) blocks carrier thread (pinning)</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Virtual Threads</h2>
+					<p>Spring MVC Servlet Container Tomcat, 200 concurrent requests</p>
+					<div class="r-stack">
+						<img class="fragment fade-in-then-out" src="img/visual-vm-virtual-threads-chart.png">
+						<img class="fragment fade-in-then-out" src="img/visual-vm-virtual-threads-details.png">
+						<img class="fragment fade-in-then-out" src="img/virtual-native-memory-consumption.png">
+					</div>
+				</section>
+				<section>
+					<h2>Virtual Threads</h2>
+					<p>Summary:</p>
+					<ul>
+						<li>back to old school (easy to understand thread-per-request model)</li>
+						<li>solves problems of JVM platform thread</li>
+						<li>simplify programming (imperative paradigm)</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Reactive vs Virtual Threads</h2>
+					<ul>
+						<li>both fixing resource wasting blocking on IO</li>
+						<li>both uses thread sharing</li>
+						<li>similar memory usage</li>
+						<li>similar performance</li>
+						<li>virtual threads supports Thread Local</li>
+						<li>virtual threads are simpler to program, debug</li>
+						<li>reactive has built-in backpressure support</li>
+						<li>reactive offers rich composition options (composability and readability)</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Backpressure</h2>
+					<p>Process max 10 users in parallel (Reactor)</p>
+					<pre><code data-trim class="java">
+readUsersFromDB()
+  .flatMap(user -> processUser(user), 10)
+  .doOnNext(processedUser -> log.info("Finished processing user: {}", processedUser))
+					</code></pre>
+				</section>
+				<section>
+					<h2>Backpressure</h2>
+					<p>Process max 10 users in parallel (Virtual Threads)</p>
+					<pre><code data-trim class="java">
+Iterable<String> usersFromDB = readUsersFromDB();
+Semaphore semaphore = new Semaphore(10);
+try (var virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
+	usersFromDB.forEach(user -> virtualThreadExecutor.submit(() -> {
+		try {
+			semaphore.acquire();
+			log.info("Start processing user: {}", user);
+			String processedUser = processUser(user);
+			log.info("Finished processing user: {}", processedUser);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		} finally {
+			semaphore.release();
+		}
+	}));
+}
+					</code></pre>
+				</section>
+				<section>
+					<h2>Composability and Readability</h2>
+					<p>Calculate withdraw with exchange rate (Reactor)</p>
+					<pre><code data-trim class="java">
+Mono.firstWithValue(
+		readExchangeRateFromA(), 
+		readExchangeRateFromB(), 
+		readExchangeRateFromC())
+	.doOnNext(exchangeRate -> log.info("Got exchange rate {}", exchangeRate))
+	.doOnError(throwable -> log.warn("Exception when checking rate", throwable))
+	.onErrorReturn(BigDecimal.ONE)
+	.map(exchangeRate -> calculateWithdraw(exchangeRate));
+					</code></pre>
+				</section>
+				<section>
+					<h2>Composability and Readability</h2>
+					<p>Calculate withdraw with exchange rate (Virtual Threads)</p>
+					<pre><code data-trim class="java">
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+	BigDecimal exchangeRate = executor.invokeAny(List.of(
+			() -> readExchangeRateFromA(),
+			() -> readExchangeRateFromB(),
+			() -> readExchangeRateFromC())
+	);
+	log.info("Got exchange rate: {}", exchangeRate);
+	return calculateWithdraw(exchangeRate);
+} catch (ExecutionException | InterruptedException e) {
+	log.warn("Exception when checking rate", e);
+	return calculateWithdraw(BigDecimal.ONE);
+}
+					</code></pre>
+				</section>
+				<section>
+					<h2>Virtual Threads or Reactive (WebFlux)?</h2>
+					<h1>It depends!!!</h1>
+					<ul>
+						<li>Project Loom: simple request -> response without complex parallel processing, backpressure</li>
+						<li>otherwise -> keep it with Reactor</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Virtual Threads or Reactor?</h2>
+					<h1>Works great together!!!</h1>
+					<p>Call blocking code on Schedulers.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())</p>
+				</section>
+				<section>
+					<h2>Load Test</h2>
+					<ul>
+						<li>using JMeter with 1000 Threads (users)</li>
+						<li>100 seconds test duration</li>
+						<li>JMeter makes GET requests</li>
+						<li>application for every request calls service (WireMock)</li>
+						<li>scenario 1. WireMock with no delay</li>
+						<li>scenario 2. WireMock with 1 second delay</li>
+					</ul>
+				</section>
+				<section>
+					<h2>Load Test (blocking, scenario 1.)</h2>
+					<div class="r-stack">
+						<img class="fragment fade-in-then-out" src="img/blocking/no_delay/response_time.png" width="850" height="500">
+						<img class="fragment fade-in-then-out" src="img/blocking/no_delay/lt_summary.png">
+						<img class="fragment fade-in-then-out" src="img/blocking/no_delay/memory.png">
+						<img class="fragment fade-in-then-out" src="img/blocking/no_delay/threads.png">
+					</div>
+				</section>
+				<section>
+					<h2>Load Test (WebFlux, scenario 1.)</h2>
+					<div class="r-stack">
+						<img class="fragment fade-in-then-out" src="img/reactor/no_delay/response_time.png" width="850" height="500">
+						<img class="fragment fade-in-then-out" src="img/reactor/no_delay/lt_summary.png">
+						<img class="fragment fade-in-then-out" src="img/reactor/no_delay/memory.png">
+						<img class="fragment fade-in-then-out" src="img/reactor/no_delay/threads.png">
+					</div>
+				</section>
+				<section>
+					<h2>Load Test (Virtual Threads, scenario 1.)</h2>
+					<div class="r-stack">
+						<img class="fragment fade-in-then-out" src="img/virtual_thread/no_delay/response_time.png" width="850" height="500">
+						<img class="fragment fade-in-then-out" src="img/virtual_thread/no_delay/lt_summary.png">
+						<img class="fragment fade-in-then-out" src="img/virtual_thread/no_delay/memory.png">
+						<img class="fragment fade-in-then-out" src="img/virtual_thread/no_delay/threads.png">
+					</div>
+				</section>
+				<section>
+					<h2>Load Test (blocking, scenario 2.)</h2>
+					<div class="r-stack">
+						<img class="fragment fade-in-then-out" src="img/blocking/delay_1s/response_time.png" width="850" height="500">
+						<img class="fragment fade-in-then-out" src="img/blocking/delay_1s/lt_summary.png">
+						<img class="fragment fade-in-then-out" src="img/blocking/delay_1s/memory.png">
+						<img class="fragment fade-in-then-out" src="img/blocking/delay_1s/threads.png">
+					</div>
+				</section>
+				<section>
+					<h2>Load Test (WebFlux, scenario 2.)</h2>
+					<div class="r-stack">
+						<img class="fragment fade-in-then-out" src="img/reactor/delay_1s/response_time.png" width="850" height="500">
+						<img class="fragment fade-in-then-out" src="img/reactor/delay_1s/lt_summary.png">
+						<img class="fragment fade-in-then-out" src="img/reactor/delay_1s/memory.png">
+						<img class="fragment fade-in-then-out" src="img/reactor/delay_1s/threads.png">
+					</div>
+				</section>
+				<section>
+					<h2>Load Test (Virtual Threads, scenario 2.)</h2>
+					<div class="r-stack">
+						<img class="fragment fade-in-then-out" src="img/virtual_thread/delay_1s/response_time.png" width="850" height="500">
+						<img class="fragment fade-in-then-out" src="img/virtual_thread/delay_1s/lt_summary.png">
+						<img class="fragment fade-in-then-out" src="img/virtual_thread/delay_1s/memory.png">
+						<img class="fragment fade-in-then-out" src="img/virtual_thread/delay_1s/threads.png">
+					</div>
+				</section>
+				<section>
+					<p>References:</p>
+					<ul>
+						<li><a href="https://openjdk.org/jeps/425">JEP-425</a></li>
+						<li><a href="https://openjdk.org/jeps/436">JEP-436</a></li>
+						<li><a href="https://openjdk.org/jeps/444">JEP-444</a></li>
+						<li><a href="https://www.youtube.com/watch?v=Om8dIt3cJIU">Java 21™ What's new and noteworthy?</a></li>
+						<li><a href="https://www.youtube.com/watch?v=n_XRUljffu0">Project Loom: Revolution in concurrency or obscure implementation detail?</a></li>
+						<li><a href="https://www.youtube.com/watch?v=YwG04UZP2a0">Project Loom - A Friend or Foe of Reactive?</a></li>
+						<li><a href="https://www.baeldung.com/java-virtual-thread-vs-thread">Difference Between Thread and Virtual Thread in Java</a></li>
+					</ul>
+				</section>
+			</div>
+		</div>
+
+		<script src="dist/reveal.js"></script>
+		<script src="plugin/notes/notes.js"></script>
+		<script src="plugin/markdown/markdown.js"></script>
+		<script src="plugin/highlight/highlight.js"></script>
+		<script>
+			// More info about initialization & config:
+			// - https://revealjs.com/initialization/
+			// - https://revealjs.com/config/
+			Reveal.initialize({
+				hash: true,
+				width: 1400,
+				// Learn about plugins: https://revealjs.com/plugins/
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+			});
+		</script>
+	</body>
+</html>
